@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Pro - Date History Build</title>
+    <style>
+        :root[data-theme="light"] {
+            --bg-color: #f0f4f8; --card-bg: #ffffff; --text-main: #202124; --text-secondary: #5f6368;
+            --text-muted: #9aa0a6; --border-color: #e8eaed; --input-bg: #ffffff; --mode-toggle-bg: #f1f3f4;
+            --accent: #1a73e8; --shadow: rgba(0,0,0,0.08);
+        }
+        :root[data-theme="dark"] {
+            --bg-color: #121212; --card-bg: #1e1e1e; --text-main: #e8eaed; --text-secondary: #bdc1c6;
+            --text-muted: #80868b; --border-color: #3c4043; --input-bg: #2d2e31; --mode-toggle-bg: #2d2e31;
+            --accent: #8ab4f8; --shadow: rgba(0,0,0,0.4);
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: flex-start; padding-top: 60px; min-height: 100vh; margin: 0; background: var(--bg-color); color: var(--text-main); transition: 0.3s ease; }
+        .app-container { background: var(--card-bg); padding: 2.5rem; border-radius: 28px; box-shadow: 0 20px 40px var(--shadow); text-align: center; width: 420px; position: relative; overflow: hidden; }
+        
+        .progress-container { width: 100%; height: 8px; background: var(--border-color); position: absolute; top: 0; left: 0; z-index: 5; }
+        #progressBar { height: 100%; width: 100%; background: var(--accent); transition: width 1s linear; border-radius: 28px 28px 0 0; }
+
+        .theme-toggle { position: absolute; top: 25px; right: 25px; cursor: pointer; border: none; background: none; font-size: 1.4rem; z-index: 10; }
+
+        .stats-bar { display: flex; justify-content: space-around; background: var(--mode-toggle-bg); padding: 14px; border-radius: 14px; margin-top: 20px; margin-bottom: 15px; }
+        .stat-item { display: flex; align-items: baseline; gap: 6px; font-size: 0.85rem; }
+        .stat-value { font-size: 1rem; font-weight: bold; color: var(--accent); }
+
+        .modes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1rem; }
+        .mode-row { display: flex; align-items: center; background: var(--mode-toggle-bg); border-radius: 14px; padding: 6px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .mode-row.active { border-color: var(--accent); }
+        .mode-label { flex: 1; text-align: left; padding-left: 12px; font-size: 0.9rem; font-weight: 600; }
+        
+        .mode-input-container { display: flex; align-items: center; background: var(--card-bg); border-radius: 8px; padding: 2px 10px; }
+        .mode-time-input { width: 35px; border: none; background: transparent; color: var(--text-main); font-weight: bold; text-align: center; outline: none; }
+
+        .timer { font-size: 5.5rem; font-weight: 200; margin: 0.5rem 0; color: var(--accent); font-variant-numeric: tabular-nums; }
+        
+        .volume-container { display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; justify-content: center; }
+        input[type=range] { cursor: pointer; width: 100px; accent-color: var(--accent); }
+        .mute-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 0; filter: grayscale(1); transition: 0.2s; }
+        .mute-btn.active { filter: grayscale(0); transform: scale(1.1); }
+
+        .controls { display: flex; gap: 15px; justify-content: center; align-items: center; margin-bottom: 1.5rem; }
+        button.main-btn { background: var(--accent); color: white; border: none; padding: 14px 45px; border-radius: 14px; cursor: pointer; font-size: 1.1rem; font-weight: 600; }
+        
+        .history-section { border-top: 1px solid var(--border-color); padding-top: 1.5rem; text-align: left; max-height: 200px; overflow-y: auto; }
+        .history-section h2 { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="progress-container"><div id="progressBar"></div></div>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+
+        <div class="stats-bar">
+            <div class="stat-item"><span class="stat-value" id="totalMinutes">0</span><span>Work Mins</span></div>
+            <div class="stat-item"><span class="stat-value" id="sessionCount">0</span><span>Sessions</span></div>
+        </div>
+
+        <div class="modes">
+            <div class="mode-row active" id="workMode" onclick="selectMode('work', this)">
+                <span class="mode-label">Focus Session</span>
+                <div class="mode-input-container">
+                    <input type="number" class="mode-time-input" id="workTime" value="25" onchange="updateCustomTime('work', this.value)" onclick="event.stopPropagation()">
+                    <span>m</span>
+                </div>
+            </div>
+            <div class="mode-row" id="breakMode" onclick="selectMode('break', this)">
+                <span class="mode-label">Short Break</span>
+                <div class="mode-input-container">
+                    <input type="number" class="mode-time-input" id="breakTime" value="5" onchange="updateCustomTime('break', this.value)" onclick="event.stopPropagation()">
+                    <span>m</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="goalDisplay" style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem; min-height: 1.5rem;"></div> 
+        <input type="text" id="goalInput" placeholder="What is your focus goal?">
+        
+        <div class="timer" id="display">25:00</div>
+
+        <div class="volume-container">
+            <button class="mute-btn" id="muteBtn" onclick="toggleMute()" title="Toggle Mute">🔊</button>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.5" oninput="updateVolume(this.value)">
+        </div>
+        
+        <div class="controls">
+            <button onclick="toggleTimer()" id="controlBtn" class="main-btn">Start</button>
+            <button onclick="resetTimer()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-weight:600;">Reset</button>
+        </div>
+
+        <div class="history-section">
+            <h2>History <button style="cursor:pointer; color:#d93025; border:none; background:none; font-size:0.7rem;" onclick="clearHistory()">Clear All</button></h2>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <audio id="alarmSound" src="Yay_SE.mp3"></audio>
+
+    <script>
+        let totalTime = 1500;
+        let timeLeft = 1500;
+        let timerId = null;
+        let currentModeType = 'work';
+        let customSettings = { work: 25, break: 5 };
+        let isMuted = false;
+
+        window.onload = () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeBtn').textContent = savedTheme === 'light' ? '🌙' : '☀️';
+            
+            const savedVolume = localStorage.getItem('focusVolume') || 0.5;
+            document.getElementById('volumeSlider').value = savedVolume;
+            document.getElementById('alarmSound').volume = savedVolume;
+
+            const savedMute = localStorage.getItem('isMuted') === 'true';
+            if (savedMute) {
+                isMuted = true;
+                document.getElementById('muteBtn').textContent = '🔇';
+                document.getElementById('muteBtn').classList.add('active');
+            }
+
+            const savedSettings = JSON.parse(localStorage.getItem('focusSettings'));
+            if (savedSettings) {
+                customSettings = savedSettings;
+                document.getElementById('workTime').value = customSettings.work;
+                document.getElementById('breakTime').value = customSettings.break;
+                totalTime = customSettings.work * 60;
+                timeLeft = totalTime;
+            }
+            updateDisplay();
+            renderHistory();
+        };
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const newTheme = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            document.getElementById('themeBtn').textContent = newTheme === 'light' ? '🌙' : '☀️';
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function updateVolume(val) {
+            const audio = document.getElementById('alarmSound');
+            audio.volume = val;
+            if (!isMuted) {
+                audio.currentTime = 0;
+                audio.play();
+                setTimeout(() => { audio.pause(); }, 400);
+            }
+            localStorage.setItem('focusVolume', val);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('muteBtn');
+            btn.textContent = isMuted ? '🔇' : '🔊';
+            btn.classList.toggle('active');
+            localStorage.setItem('isMuted', isMuted);
+        }
+
+        function updateCustomTime(mode, value) {
+            const mins = parseInt(value);
+            if (isNaN(mins) || mins <= 0) return;
+            customSettings[mode] = mins;
+            localStorage.setItem('focusSettings', JSON.stringify(customSettings));
+            if (mode === currentModeType) { totalTime = mins * 60; timeLeft = totalTime; updateDisplay(); }
+        }
+
+        function selectMode(type, element) {
+            if (timerId) return;
+            currentModeType = type;
+            totalTime = customSettings[type] * 60;
+            timeLeft = totalTime;
+            document.querySelectorAll('.mode-row').forEach(row => row.classList.remove('active'));
+            element.classList.add('active');
+            updateDisplay();
+        }
+
+        function toggleTimer() {
+            const input = document.getElementById('goalInput');
+            const displayGoal = document.getElementById('goalDisplay');
+            const btn = document.getElementById('controlBtn');
+            if (!timerId && input.value !== "") {
+                displayGoal.textContent = input.value;
+                input.style.display = "none";
+            } else if (!timerId && input.value === "" && currentModeType === 'break') {
+                displayGoal.textContent = "Taking a break";
+                input.style.display = "none";
+            } else if (!timerId) {
+                displayGoal.textContent = "Focus Session";
+                input.style.display = "none";
+            }
+
+            if (timerId) {
+                clearInterval(timerId);
+                timerId = null;
+                btn.textContent = "Resume";
+            } else {
+                btn.textContent = "Pause";
+                timerId = setInterval(() => {
+                    if (timeLeft > 0) { timeLeft--; updateDisplay(); }
+                    else { finishSession(); }
+                }, 1000);
+            }
+        }
+
+        function updateDisplay() {
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            document.getElementById('display').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            const percentage = (timeLeft / totalTime) * 100;
+            document.getElementById('progressBar').style.width = percentage + "%";
+        }
+
+        function finishSession() {
+            clearInterval(timerId);
+            timerId = null;
+            if (!isMuted) {
+                document.getElementById('alarmSound').play();
+            }
+            const taskName = document.getElementById('goalDisplay').textContent || "Focus Session";
+            saveToHistory(taskName, totalTime / 60, currentModeType);
+            alert("Session Complete!");
+            resetTimer();
+        }
+
+        // UPDATED: Capturing a clean date string
+        function saveToHistory(task, duration, mode) {
+            const history = JSON.parse(localStorage.getItem('focusHistory') || '[]');
+            const now = new Date();
+            const entry = { 
+                task, 
+                duration, 
+                mode, 
+                fullDate: now.toLocaleDateString(), 
+                // NEW: Date display format (e.g., 10 Feb)
+                dateStr: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) 
+            };
+            history.unshift(entry);
+            localStorage.setItem('focusHistory', JSON.stringify(history));
+            renderHistory();
+        }
+
+        // UPDATED: Rendering date instead of time
+        function renderHistory() {
+            const history = JSON.parse(localStorage.getItem('focusHistory') || '[]');
+            const list = document.getElementById('historyList');
+            const today = new Date().toLocaleDateString();
+            let work = 0; let count = 0;
+            
+            history.forEach(item => { if(item.fullDate === today && item.mode === 'work') { work += item.duration; count++; } });
+            document.getElementById('totalMinutes').textContent = work;
+            document.getElementById('sessionCount').textContent = count;
+            
+            list.innerHTML = history.slice(0, 8).map(item => `
+                <div style="font-size:0.8rem; padding:8px 0; border-bottom:1px solid var(--border-color);">
+                    <strong>${item.task}</strong><br>
+                    <span style="color:var(--text-muted); font-size:0.7rem;">${item.duration}m • ${item.dateStr}</span>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            if(confirm("Clear all history?")) { localStorage.removeItem('focusHistory'); renderHistory(); }
+        }
+
+        function resetTimer() {
+            clearInterval(timerId);
+            timerId = null;
+            timeLeft = totalTime;
+            updateDisplay();
+            document.getElementById('controlBtn').textContent = "Start";
+            document.getElementById('goalInput').style.display = "inline-block";
+            document.getElementById('goalDisplay').textContent = "";
+        }
+    </script>
+</body>
+</html>
